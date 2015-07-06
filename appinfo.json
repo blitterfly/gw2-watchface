@@ -1,0 +1,30 @@
+{
+  "uuid": "8eb67cfe-d036-4adc-aa88-f187e702f945",
+  "shortName": "gw2-watchface",
+  "longName": "gw2-watchface",
+  "companyName": "blitterfly.com",
+  "versionLabel": "1.0",
+  "sdkVersion": "3",
+  "targetPlatforms": ["basalt"],
+  "watchapp": {
+    "watchface": true
+  },
+  "appKeys": {
+    "KEY_TWEET": 0
+  },
+  "resources": {
+    "media": [
+    {
+		"type": "png",
+		"name": "IMAGE_BACKGROUND",
+		"file": "images/hot-watchface.png"
+	},
+	{
+		"type": "font",
+		"name": "FONT_CRONOSPRO_44",
+		"file": "fonts/cronos-pro-display.ttf",
+		"characterRegex": "[:0-9]"
+	}
+	]
+  }
+}
