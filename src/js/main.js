@@ -1,74 +1,101 @@
-// CONSUMER_KEY, CONSUMER_SECRET, ACCESS_TOKEN, ACCESS_SECRET defined in secrets.js
+var GW2_REALMS = {};
+var GW2_MATCHES = [];
+var match_next = 0;
 
-/*
-function getTweets() {
-	// Construct URL
-	var url = 'https://api.twitter.com/1.1/statuses/user_timeline.json';
-	console.log('URL ' + url);
-	
-	// OAuth signature
-	var nonce = Date.now(), timestamp = Math.floor(Date.now() / 1000);
-	var base_signature = 'GET&' + encodeURIComponent(url) + 
-		'&count%3D1' +
-		'%26oauth_consumer_key%3D' +  encodeURIComponent(CONSUMER_KEY) +
-		'%26oauth_nonce%3D'+ nonce +
-		'%26oauth_signature_method%3DHMAC-SHA1' +
-		'%26oauth_timestamp%3D' + timestamp +
-		'%26oauth_token%3D' + encodeURIComponent(ACCESS_TOKEN) +
-		'%26oauth_version%3D1.0' +
-		'%26screen_name%3DHalo';
-	var signing_secret = encodeURIComponent(CONSUMER_SECRET) + '&' + encodeURIComponent(ACCESS_SECRET);
-	var signature = CryptoJS.HmacSHA1(base_signature, signing_secret).toString(CryptoJS.enc.Base64);
-	
-	// Send request to Twitter
+var xhrRequest = function(url, type, callback) {
 	var xhr = new XMLHttpRequest();
 	xhr.onload = function() {
-		// responseText contains a JSON object with weather info
-		var json = JSON.parse(this.responseText);
-		console.log('Got tweet: ' + json[0].text);
-			
+		callback(JSON.parse(this.responseText));
+	};
+	xhr.onerror = function() {
+		console.log('XMLHttpRequest error! ' + this.status + ' ' + this.statusText);
+	};
+	xhr.open(type, url);
+	xhr.send();
+};
+
+function getRealmsAndMatches() {
+	xhrRequest('https://api.guildwars2.com/v1/world_names.json?lang=en', 'GET', function(json) {
+		for (var i = 0; i < json.length; i++) {
+			GW2_REALMS[ json[i].id ] = json[i].name;
+		}
+		getMatches();
+	});
+};
+
+function getMatches() {
+	xhrRequest('https://api.guildwars2.com/v1/wvw/matches.json', 'GET', function(json) {
+		GW2_MATCHES = [];
+		for (var i = 0; i < json.wvw_matches.length; i++) {
+			var match = json.wvw_matches[i];
+			GW2_MATCHES.push({
+				'red_realm': GW2_REALMS[match.red_world_id],
+				'blue_realm': GW2_REALMS[match.blue_world_id],
+				'green_realm': GW2_REALMS[match.green_world_id]
+			});
+			getMatchDetails(match.wvw_match_id, GW2_MATCHES[GW2_MATCHES.length - 1]);
+		}
+	});
+};
+
+function getMatchDetails(match_id, match_obj) {
+	xhrRequest('https://api.guildwars2.com/v1/wvw/match_details.json?match_id=' + match_id, 'GET', function(json) {
+		var total_score = json.scores[0] + json.scores[1] + json.scores[2];
+		match_obj['red_score'] = Math.floor(json.scores[0] / total_score * 100);
+		match_obj['blue_score'] = Math.floor(json.scores[1] / total_score * 100);
+		match_obj['green_score'] = Math.floor(json.scores[2] / total_score * 100);
+	});	
+}
+
+function getNextMatch() {
+	if (match_next >= GW2_MATCHES.length) {
+		match_next = 0;
+	}
+	
+	var match = GW2_MATCHES[match_next];
+	if (match && match.red_score) {
+		console.log('Got next match: ' + JSON.stringify(match));
 		// Assemble dictionary using our keys
-		var dictionary = { 'KEY_TWEET': json[0].text };
-			
+		var dictionary = {
+			'KEY_RED_NAME': match.red_realm,
+			'KEY_RED_SCORE': match.red_score,
+			'KEY_BLUE_NAME': match.blue_realm,
+			'KEY_BLUE_SCORE': match.blue_score,
+			'KEY_GREEN_NAME': match.green_realm,
+			'KEY_GREEN_SCORE': match.green_score
+		};
+		
 		// Send to Pebble
 		Pebble.sendAppMessage(dictionary,
 			function(e) {
-				onsole.log('Tweet sent to Pebble successfully!');
+				console.log('Data sent to Pebble successfully!');
+				match_next++;
 			},
 			function(e) {
-				console.log('Error sending tweet to Pebble!');
+				console.log('Error sending data to Pebble!');
 			}
 		);
-	};
-	xhr.onerror = function() {
-		console.log('Error! ' + this.status + ' ' + this.statusText);
-	};
-	xhr.open('GET', url + '?screen_name=Halo&count=1');
-	xhr.setRequestHeader('Authorization',
-		'OAuth oauth_consumer_key="' + CONSUMER_KEY + '", ' +
-		'oauth_nonce="' + nonce + '", ' + 
-		'oauth_signature="' + encodeURIComponent(signature) + '", ' +
-		'oauth_signature_method="HMAC-SHA1", ' +
-		'oauth_timestamp="' + timestamp + '", ' +
-		'oauth_token="' + ACCESS_TOKEN + '", ' +
-		'oauth_version="1.0"');
-	
-	xhr.send();
-}
-*/
+	}
+};
 
 // Listen for when the watchface is opened
 Pebble.addEventListener('ready', 
 	function(e) {
 		console.log('PebbleKit JS ready!');
-		//getTweets();
+		getRealmsAndMatches();
 	}
 );
 
 // Listen for when an AppMessage is received
 Pebble.addEventListener('appmessage',
 	function(e) {
-		console.log('AppMessage received!');
-		//getTweets();
+		console.log('Received message: ' + JSON.stringify(e.payload));
+		if (e.payload['KEY_UPDATEMODE'] === 0) {
+			// reload super-date
+			//getRealmsAndMatches();
+		} else {
+			// return the next match
+			getNextMatch();
+		}
 	}                     
 );

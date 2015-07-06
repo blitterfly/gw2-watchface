@@ -1,6 +1,16 @@
 #include <pebble.h>
 
-#define KEY_TWEET 0
+#define KEY_UPDATEMODE 0
+#define KEY_RED_NAME 1
+#define KEY_RED_SCORE 2
+#define KEY_BLUE_NAME 3
+#define KEY_BLUE_SCORE 4
+#define KEY_GREEN_NAME 5
+#define KEY_GREEN_SCORE 6
+
+#define REALM_NAME_SIZE 32
+#define MIN_REALM_LABEL_SIZE 72
+#define REALM_LABEL_SIZE(p) (MIN_REALM_LABEL_SIZE + (int)((144.0f - (float)MIN_REALM_LABEL_SIZE) * ((float)p / 100.0f)))
 
 #define HAND_MARGIN  10
 #define FINAL_RADIUS 75
@@ -13,14 +23,27 @@ typedef struct {
 	int minutes;
 } Time;
 
+typedef struct {
+	char red_name[REALM_NAME_SIZE];
+	char blue_name[REALM_NAME_SIZE];
+	char green_name[REALM_NAME_SIZE];
+	int red_score;
+	int blue_score;
+	int green_score;
+} Match;
+
 static Window * s_main_window;
 static TextLayer * s_time_layer;
 static GFont s_time_font;
 static BitmapLayer * s_background_layer;
 static GBitmap * s_background_bitmap;
 
-static Layer *s_canvas_layer;
+static GFont s_realm_font;
+static TextLayer * s_red_layer;
+static TextLayer * s_blue_layer;
+static TextLayer * s_green_layer;
 
+static Layer * s_canvas_layer;
 static GPoint s_center;
 static Time s_last_time, s_anim_time;
 static int s_radius = 0, s_anim_hours_60 = 0;
@@ -89,18 +112,29 @@ static void tick_handler(struct tm * tick_time, TimeUnits units_changed) {
 	update_time(tick_time);
 	update_hands(tick_time);
 	
-	// Get latest tweet update every 30 minutes
-	/*if(tick_time->tm_min % 30 == 0) {
-		// Begin dictionary
+	// Update data every 30 minutes)
+	if (tick_time->tm_min % 30 == 0) {
 		DictionaryIterator * iter;
 		app_message_outbox_begin(&iter);
 		
 		// Add a key-value pair
-		dict_write_uint8(iter, 0, 0);
+		dict_write_uint8(iter, KEY_UPDATEMODE, 0);
 		
 		// Send the message!
 		app_message_outbox_send();
-	}*/
+	}
+	
+	// Get a different match every minute
+	{
+		DictionaryIterator * iter;
+		app_message_outbox_begin(&iter);
+			
+		// Add a key-value pair
+		dict_write_uint8(iter, KEY_UPDATEMODE, 1);
+			
+		// Send the message!
+		app_message_outbox_send();
+	}
 }
 
 static void update_proc(Layer *layer, GContext *ctx) {	
@@ -142,6 +176,24 @@ static void update_proc(Layer *layer, GContext *ctx) {
 	}
 }
 
+static void set_realm_text_sizes(int red, int blue, int green) {
+	int red_w = REALM_LABEL_SIZE(red);
+	int blue_w = REALM_LABEL_SIZE(blue);
+	int green_w = REALM_LABEL_SIZE(green);
+	
+	/*APP_LOG(APP_LOG_LEVEL_INFO, "red_w: %d", red_w);
+	APP_LOG(APP_LOG_LEVEL_INFO, "blue_w: %d", blue_w);
+	APP_LOG(APP_LOG_LEVEL_INFO, "green_w: %d", green_w);*/
+	
+	// this would be nicer, but doesn't work for some reason?
+	/*layer_set_bounds(text_layer_get_layer(s_red_layer), GRect(0, 123, red_w, 15));
+	layer_set_bounds(text_layer_get_layer(s_blue_layer), GRect(72 - (blue_w / 2), 138, blue_w, 15));
+	layer_set_bounds(text_layer_get_layer(s_green_layer), GRect(144 - green_w, 153, green_w, 15));*/
+	
+	text_layer_set_size(s_red_layer, GSize(red_w, 16));
+	text_layer_set_size(s_blue_layer, GSize(blue_w, 16));
+	text_layer_set_size(s_green_layer, GSize(green_w, 16));
+}
 
 static void main_window_load(Window * window) {
 	Layer * window_layer = window_get_root_layer(window);
@@ -155,6 +207,7 @@ static void main_window_load(Window * window) {
 	
 	// Create GFont
 	s_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CRONOSPRO_16));
+	s_realm_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CRONOSPRO_14));
 
 	// Create time TextLayer
 	GSize time_size = graphics_text_layout_get_content_size("00:00", s_time_font, canvas_rect, GTextOverflowModeFill, GTextAlignmentCenter);
@@ -166,6 +219,31 @@ static void main_window_load(Window * window) {
 	
 	// Add it as a child layer to the Window's root layer
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+		
+	// WvW scores
+	s_red_layer = text_layer_create(GRect(0, 120, MIN_REALM_LABEL_SIZE, 16));
+	text_layer_set_background_color(s_red_layer, GColorRed);
+	text_layer_set_text_color(s_red_layer, GColorWhite);
+	text_layer_set_font(s_red_layer, s_realm_font);
+	text_layer_set_overflow_mode(s_red_layer, GTextOverflowModeWordWrap);
+	text_layer_set_text(s_red_layer, " Loading ...");
+	layer_add_child(window_layer, text_layer_get_layer(s_red_layer));
+	
+	s_blue_layer = text_layer_create(GRect(0, 136, MIN_REALM_LABEL_SIZE, 16));
+	text_layer_set_background_color(s_blue_layer, GColorBlue);
+	text_layer_set_text_color(s_blue_layer, GColorWhite);
+	text_layer_set_font(s_blue_layer, s_realm_font);
+	text_layer_set_overflow_mode(s_blue_layer, GTextOverflowModeWordWrap);
+	layer_add_child(window_layer, text_layer_get_layer(s_blue_layer));
+	
+	s_green_layer = text_layer_create(GRect(0, 152, MIN_REALM_LABEL_SIZE, 16));
+	text_layer_set_background_color(s_green_layer, GColorDarkGreen);
+	text_layer_set_text_color(s_green_layer, GColorWhite);
+	text_layer_set_font(s_green_layer, s_realm_font);
+	text_layer_set_overflow_mode(s_green_layer, GTextOverflowModeWordWrap);
+	layer_add_child(window_layer, text_layer_get_layer(s_green_layer));
+	
+	//set_realm_text_sizes(33, 33, 33);
 	
 	// Clock-face drawing
 	GRect window_bounds = layer_get_bounds(window_layer);
@@ -187,6 +265,9 @@ static void main_window_load(Window * window) {
 static void main_window_unload(Window * window) {
 	// Destroy TextLayer
 	text_layer_destroy(s_time_layer);
+	text_layer_destroy(s_red_layer);
+	text_layer_destroy(s_blue_layer);
+	text_layer_destroy(s_green_layer);
 	
 	// Destroy clock face layer
 	layer_destroy(s_canvas_layer);
@@ -199,13 +280,14 @@ static void main_window_unload(Window * window) {
 	
 	// Unload GFont
 	fonts_unload_custom_font(s_time_font);
+	fonts_unload_custom_font(s_realm_font);
 	
 }
 
 static void inbox_received_callback(DictionaryIterator * iterator, void * context) {
 	// Store incoming information
-	/*static char tweet_buffer[80];
-	
+	static Match current_match;
+
 	// Read first item
 	Tuple * t = dict_read_first(iterator);
 	
@@ -213,8 +295,26 @@ static void inbox_received_callback(DictionaryIterator * iterator, void * contex
 	while(t != NULL) {
 		// Which key was received?
 		switch(t->key) {
-			case KEY_TWEET:
-				snprintf(tweet_buffer, sizeof(tweet_buffer), "%.76s...", t->value->cstring);
+			case KEY_RED_NAME:
+				current_match.red_name[0] = ' ';
+				strncpy(current_match.red_name + 1, t->value->cstring, REALM_NAME_SIZE - 1);
+				break;
+			case KEY_BLUE_NAME:
+				current_match.blue_name[0] = ' ';
+				strncpy(current_match.blue_name + 1, t->value->cstring, REALM_NAME_SIZE - 1);
+				break;
+			case KEY_GREEN_NAME:
+				current_match.green_name[0] = ' ';
+				strncpy(current_match.green_name + 1, t->value->cstring, REALM_NAME_SIZE - 1);
+				break;
+			case KEY_RED_SCORE:
+				current_match.red_score = t->value->int32;
+				break;
+			case KEY_BLUE_SCORE:
+				current_match.blue_score = t->value->int32;
+				break;
+			case KEY_GREEN_SCORE:
+				current_match.green_score = t->value->int32;
 				break;
 			default:
 				APP_LOG(APP_LOG_LEVEL_ERROR, "Key %d not recognized!", (int)t->key);
@@ -226,7 +326,10 @@ static void inbox_received_callback(DictionaryIterator * iterator, void * contex
 	}
 	
 	// Assemble full string and display
-	text_layer_set_text(s_tweet_layer, tweet_buffer);*/
+	set_realm_text_sizes(current_match.red_score, current_match.blue_score, current_match.green_score);
+	text_layer_set_text(s_red_layer, current_match.red_name);
+	text_layer_set_text(s_blue_layer, current_match.blue_name);
+	text_layer_set_text(s_green_layer, current_match.green_name);
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
@@ -290,13 +393,13 @@ static void init(void) {
 	animate(2 * ANIMATION_DURATION, ANIMATION_DELAY, &hands_impl, true);
 	
 	// Register callbacks
-	/*app_message_register_inbox_received(inbox_received_callback);
+	app_message_register_inbox_received(inbox_received_callback);
 	app_message_register_inbox_dropped(inbox_dropped_callback);
 	app_message_register_outbox_failed(outbox_failed_callback);
 	app_message_register_outbox_sent(outbox_sent_callback);
 	
 	// Open AppMessage
-	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());*/
+	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 }
 
 static void deinit(void) {

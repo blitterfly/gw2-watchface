@@ -10,7 +10,13 @@
     "watchface": true
   },
   "appKeys": {
-    "KEY_TWEET": 0
+    "KEY_UPDATEMODE": 0,
+    "KEY_RED_NAME": 1,
+    "KEY_RED_SCORE": 2,
+    "KEY_BLUE_NAME": 3,
+    "KEY_BLUE_SCORE": 4,
+    "KEY_GREEN_NAME": 5,
+    "KEY_GREEN_SCORE": 6
   },
   "resources": {
     "media": [
@@ -24,6 +30,11 @@
 		"name": "FONT_CRONOSPRO_16",
 		"file": "fonts/cronos-pro-display.ttf",
 		"characterRegex": "[:0-9]"
+	},
+	{
+		"type": "font",
+		"name": "FONT_CRONOSPRO_14",
+		"file": "fonts/cronos-pro-display.ttf"
 	}
 	]
   }
