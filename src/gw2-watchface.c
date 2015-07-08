@@ -7,6 +7,8 @@
 #define KEY_BLUE_SCORE 4
 #define KEY_GREEN_NAME 5
 #define KEY_GREEN_SCORE 6
+#define KEY_THIS_MATCH 7
+#define KEY_MATCHES 8
 
 #define REALM_NAME_SIZE 32
 #define MIN_REALM_LABEL_SIZE 72
@@ -42,6 +44,7 @@ static GFont s_realm_font;
 static TextLayer * s_red_layer;
 static TextLayer * s_blue_layer;
 static TextLayer * s_green_layer;
+static TextLayer * s_matches_layer;
 
 static Layer * s_canvas_layer;
 static GPoint s_center;
@@ -128,8 +131,7 @@ static void tick_handler(struct tm * tick_time, TimeUnits units_changed) {
 		// Send the message!
 		app_message_outbox_send();
 	}
-	
-	// Get a different match every minute
+	else // Get a different match every minute
 	{
 		DictionaryIterator * iter;
 		app_message_outbox_begin(&iter);
@@ -212,7 +214,7 @@ static void update_proc_battery(Layer * layer, GContext * ctx) {
 	if (s_charge_percent < 0) {
 		// currently charging
 		GRect charging_bounds = gbitmap_get_bounds(s_charging_bitmap);
-		graphics_draw_bitmap_in_rect(ctx, s_charging_bitmap, GRect(charging_bounds.x + 2, charging_bounds + 1, charging_bounds.size.w, charging_bounds.size.h));
+		graphics_draw_bitmap_in_rect(ctx, s_charging_bitmap, GRect(charging_bounds.origin.x + 2, charging_bounds.origin.y + 1, charging_bounds.size.w, charging_bounds.size.h));
 	}
 }
 
@@ -230,14 +232,15 @@ static void set_realm_text_sizes(int red, int blue, int green) {
 	layer_set_bounds(text_layer_get_layer(s_blue_layer), GRect(72 - (blue_w / 2), 138, blue_w, 15));
 	layer_set_bounds(text_layer_get_layer(s_green_layer), GRect(144 - green_w, 153, green_w, 15));*/
 	
-	text_layer_set_size(s_red_layer, GSize(red_w, 16));
-	text_layer_set_size(s_blue_layer, GSize(blue_w, 16));
-	text_layer_set_size(s_green_layer, GSize(green_w, 16));
+	text_layer_set_size(s_red_layer, GSize(red_w, 14));
+	text_layer_set_size(s_blue_layer, GSize(blue_w, 14));
+	text_layer_set_size(s_green_layer, GSize(green_w, 14));
 }
 
 static void main_window_load(Window * window) {
 	Layer * window_layer = window_get_root_layer(window);
 	GRect canvas_rect = GRect(0, 0, 144, 168);
+	GRect window_bounds = layer_get_bounds(window_layer);
 	
 	// Create GBitmap, then set to created BitmapLayer
 	s_background_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND);
@@ -247,7 +250,7 @@ static void main_window_load(Window * window) {
 	
 	// Create GFont
 	s_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CRONOSPRO_16));
-	s_realm_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CRONOSPRO_14));
+	s_realm_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_CRONOSPRO_12));
 
 	// Create time TextLayer
 	GSize time_size = graphics_text_layout_get_content_size("00:00", s_time_font, canvas_rect, GTextOverflowModeFill, GTextAlignmentCenter);
@@ -270,7 +273,7 @@ static void main_window_load(Window * window) {
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 		
 	// WvW scores
-	s_red_layer = text_layer_create(GRect(0, 120, MIN_REALM_LABEL_SIZE, 16));
+	s_red_layer = text_layer_create(GRect(0, 126, MIN_REALM_LABEL_SIZE, 14));
 	text_layer_set_background_color(s_red_layer, GColorRed);
 	text_layer_set_text_color(s_red_layer, GColorWhite);
 	text_layer_set_font(s_red_layer, s_realm_font);
@@ -278,25 +281,32 @@ static void main_window_load(Window * window) {
 	text_layer_set_text(s_red_layer, " Loading ...");
 	layer_add_child(window_layer, text_layer_get_layer(s_red_layer));
 	
-	s_blue_layer = text_layer_create(GRect(0, 136, MIN_REALM_LABEL_SIZE, 16));
+	s_blue_layer = text_layer_create(GRect(0, 140, MIN_REALM_LABEL_SIZE, 14));
 	text_layer_set_background_color(s_blue_layer, GColorBlue);
 	text_layer_set_text_color(s_blue_layer, GColorWhite);
 	text_layer_set_font(s_blue_layer, s_realm_font);
 	text_layer_set_overflow_mode(s_blue_layer, GTextOverflowModeWordWrap);
 	layer_add_child(window_layer, text_layer_get_layer(s_blue_layer));
 	
-	s_green_layer = text_layer_create(GRect(0, 152, MIN_REALM_LABEL_SIZE, 16));
+	s_green_layer = text_layer_create(GRect(0, 154, MIN_REALM_LABEL_SIZE, 14));
 	text_layer_set_background_color(s_green_layer, GColorDarkGreen);
 	text_layer_set_text_color(s_green_layer, GColorWhite);
 	text_layer_set_font(s_green_layer, s_realm_font);
 	text_layer_set_overflow_mode(s_green_layer, GTextOverflowModeWordWrap);
 	layer_add_child(window_layer, text_layer_get_layer(s_green_layer));
 	
+	GSize matches_size = graphics_text_layout_get_content_size("00/00", s_realm_font, canvas_rect, GTextOverflowModeFill, GTextAlignmentRight);
+	s_matches_layer = text_layer_create(GRect(window_bounds.size.w - matches_size.w - 2, 154, matches_size.w, 14));
+	text_layer_set_background_color(s_matches_layer, GColorClear);
+	text_layer_set_text_color(s_matches_layer, GColorWhite);
+	text_layer_set_font(s_matches_layer, s_realm_font);
+	text_layer_set_text_alignment(s_matches_layer, GTextAlignmentRight);
+	text_layer_set_overflow_mode(s_matches_layer, GTextOverflowModeFill);
+	layer_add_child(window_layer, text_layer_get_layer(s_matches_layer));
+	
 	//set_realm_text_sizes(33, 33, 33);
 	
 	// Clock-face drawing
-	GRect window_bounds = layer_get_bounds(window_layer);
-	
 	s_center = (GPoint) {
 		.x = window_bounds.size.w / 2,
 		.y = 75
@@ -343,9 +353,11 @@ static void main_window_unload(Window * window) {
 static void inbox_received_callback(DictionaryIterator * iterator, void * context) {
 	// Store incoming information
 	static Match current_match;
+	static char matches_buffer[16];
 
 	// Read first item
 	Tuple * t = dict_read_first(iterator);
+	int this_match = 0, match_count = 0;
 	
 	// For all items
 	while(t != NULL) {
@@ -372,6 +384,12 @@ static void inbox_received_callback(DictionaryIterator * iterator, void * contex
 			case KEY_GREEN_SCORE:
 				current_match.green_score = t->value->int32;
 				break;
+			case KEY_THIS_MATCH:
+				this_match = t->value->int32;
+				break;
+			case KEY_MATCHES:
+				match_count = t->value->int32;
+				break;
 			default:
 				APP_LOG(APP_LOG_LEVEL_ERROR, "Key %d not recognized!", (int)t->key);
 				break;
@@ -386,6 +404,8 @@ static void inbox_received_callback(DictionaryIterator * iterator, void * contex
 	text_layer_set_text(s_red_layer, current_match.red_name);
 	text_layer_set_text(s_blue_layer, current_match.blue_name);
 	text_layer_set_text(s_green_layer, current_match.green_name);
+	snprintf(matches_buffer, 16, "%.2d/%.2d", this_match, match_count);
+	text_layer_set_text(s_matches_layer, matches_buffer);
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {

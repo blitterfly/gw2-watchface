@@ -16,7 +16,9 @@
     "KEY_BLUE_NAME": 3,
     "KEY_BLUE_SCORE": 4,
     "KEY_GREEN_NAME": 5,
-    "KEY_GREEN_SCORE": 6
+    "KEY_GREEN_SCORE": 6,
+    "KEY_THIS_MATCH": 7,
+    "KEY_MATCHES": 8
   },
   "resources": {
     "media": [
@@ -43,7 +45,7 @@
 	},
 	{
 		"type": "font",
-		"name": "FONT_CRONOSPRO_14",
+		"name": "FONT_CRONOSPRO_12",
 		"file": "fonts/cronos-pro-display.ttf"
 	}
 	]

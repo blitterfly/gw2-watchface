@@ -62,7 +62,9 @@ function getNextMatch() {
 			'KEY_BLUE_NAME': match.blue_realm,
 			'KEY_BLUE_SCORE': match.blue_score,
 			'KEY_GREEN_NAME': match.green_realm,
-			'KEY_GREEN_SCORE': match.green_score
+			'KEY_GREEN_SCORE': match.green_score,
+			'KEY_THIS_MATCH': (match_next + 1),
+			'KEY_MATCHES': GW2_MATCHES.length
 		};
 		
 		// Send to Pebble
@@ -82,7 +84,7 @@ function getNextMatch() {
 Pebble.addEventListener('ready', 
 	function(e) {
 		console.log('PebbleKit JS ready!');
-		//getRealmsAndMatches();
+		getRealmsAndMatches();
 	}
 );
 
@@ -91,8 +93,8 @@ Pebble.addEventListener('appmessage',
 	function(e) {
 		console.log('Received message: ' + JSON.stringify(e.payload));
 		if (e.payload['KEY_UPDATEMODE'] === 0) {
-			// reload super-date
-			//getRealmsAndMatches();
+			// reload super-data
+			getRealmsAndMatches();
 		} else {
 			// return the next match
 			getNextMatch();
