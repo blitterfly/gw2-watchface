@@ -25,6 +25,16 @@
 		"name": "IMAGE_BACKGROUND",
 		"file": "images/hot-watchface.png"
 	},
+    {
+		"type": "png",
+		"name": "IMAGE_HEART",
+		"file": "images/heart-filled.png"
+	},
+    {
+		"type": "png",
+		"name": "IMAGE_CHARGING",
+		"file": "images/charging.png"
+	},
 	{
 		"type": "font",
 		"name": "FONT_CRONOSPRO_16",

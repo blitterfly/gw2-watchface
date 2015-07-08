@@ -82,7 +82,7 @@ function getNextMatch() {
 Pebble.addEventListener('ready', 
 	function(e) {
 		console.log('PebbleKit JS ready!');
-		getRealmsAndMatches();
+		//getRealmsAndMatches();
 	}
 );
 
@@ -92,7 +92,7 @@ Pebble.addEventListener('appmessage',
 		console.log('Received message: ' + JSON.stringify(e.payload));
 		if (e.payload['KEY_UPDATEMODE'] === 0) {
 			// reload super-date
-			getRealmsAndMatches();
+			//getRealmsAndMatches();
 		} else {
 			// return the next match
 			getNextMatch();

@@ -49,6 +49,11 @@ static Time s_last_time, s_anim_time;
 static int s_radius = 0, s_anim_hours_60 = 0;
 static bool s_animating = false;
 
+static Layer * s_heart_layer;
+static GBitmap * s_heart_bitmap;
+static GBitmap * s_charging_bitmap;
+static int s_charge_percent = 100;
+
 /*************************** AnimationImplementation **************************/
 
 static void animation_started(Animation *anim, void *context) {
@@ -137,6 +142,18 @@ static void tick_handler(struct tm * tick_time, TimeUnits units_changed) {
 	}
 }
 
+static void battery_handler(BatteryChargeState charge_state) {
+	if (charge_state.is_charging) {
+		APP_LOG(APP_LOG_LEVEL_INFO, "battery: charging");
+		s_charge_percent = -1;
+	} else {
+		APP_LOG(APP_LOG_LEVEL_INFO, "battery: %d%% charged", charge_state.charge_percent);
+		s_charge_percent = charge_state.charge_percent;
+	}
+	
+	layer_mark_dirty(s_heart_layer);
+}
+
 static void update_proc(Layer *layer, GContext *ctx) {	
 	graphics_context_set_stroke_color(ctx, GColorSunsetOrange);
 	graphics_context_set_stroke_width(ctx, 4);
@@ -173,6 +190,29 @@ static void update_proc(Layer *layer, GContext *ctx) {
 	} 
 	if(s_radius > HAND_MARGIN) {
 		graphics_draw_line(ctx, s_center, minute_hand);
+	}
+}
+
+static void update_proc_battery(Layer * layer, GContext * ctx) {
+	static GBitmap * s_heart_clipped = 0;
+	
+	GRect heart_bounds = gbitmap_get_bounds(s_heart_bitmap);
+	int hh = heart_bounds.size.h;
+	if (s_charge_percent >= 0) {
+		// charge percent
+		hh = (hh - 12) / 2 + (int)((float)12 * ((float)s_charge_percent / 100.0f)); // actual "fillable" part is about 12 pixels
+	}
+	if (s_heart_clipped) {
+		gbitmap_destroy(s_heart_clipped);
+	}
+	s_heart_clipped = gbitmap_create_as_sub_bitmap(s_heart_bitmap, GRect(0, heart_bounds.size.h - hh, heart_bounds.size.w, hh));
+	
+	graphics_context_set_compositing_mode(ctx, GCompOpSet);
+	graphics_draw_bitmap_in_rect(ctx, s_heart_clipped, GRect(heart_bounds.origin.x, heart_bounds.origin.y  + heart_bounds.size.h - hh, heart_bounds.size.w, hh));
+	if (s_charge_percent < 0) {
+		// currently charging
+		GRect charging_bounds = gbitmap_get_bounds(s_charging_bitmap);
+		graphics_draw_bitmap_in_rect(ctx, s_charging_bitmap, GRect(charging_bounds.x + 2, charging_bounds + 1, charging_bounds.size.w, charging_bounds.size.h));
 	}
 }
 
@@ -217,6 +257,15 @@ static void main_window_load(Window * window) {
 	text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 	text_layer_set_font(s_time_layer, s_time_font);
 	
+	// Creat heart (battery) layer
+	s_heart_layer = layer_create(GRect(2, 0, 20, 20));
+	layer_set_update_proc(s_heart_layer, update_proc_battery);
+	layer_add_child(window_layer, s_heart_layer);
+	
+	// Create heart bitmap
+	s_heart_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_HEART);
+	s_charging_bitmap =  gbitmap_create_with_resource(RESOURCE_ID_IMAGE_CHARGING);
+	
 	// Add it as a child layer to the Window's root layer
 	layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
 		
@@ -260,6 +309,10 @@ static void main_window_load(Window * window) {
 	// Register with TickTimerService
 	tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 	
+	// Register battery handler
+	battery_state_service_subscribe(battery_handler);
+	// Prime the battery state
+	battery_handler(battery_state_service_peek());
 }
 
 static void main_window_unload(Window * window) {
@@ -269,11 +322,14 @@ static void main_window_unload(Window * window) {
 	text_layer_destroy(s_blue_layer);
 	text_layer_destroy(s_green_layer);
 	
-	// Destroy clock face layer
+	// Destroy custom layers
 	layer_destroy(s_canvas_layer);
+	layer_destroy(s_heart_layer);
 	
 	// Destroy GBitmap
 	gbitmap_destroy(s_background_bitmap);
+	gbitmap_destroy(s_heart_bitmap);
+	gbitmap_destroy(s_charging_bitmap);
 	
 	// Destroy BitmapLayer
 	bitmap_layer_destroy(s_background_layer);
